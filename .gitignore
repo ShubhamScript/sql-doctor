@@ -1,0 +1,30 @@
+# Binaries
+/sql-doctor
+/sql-doctor.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test databases & local storage
+*.db-journal
+*.db-wal
+*.db-shm
+tests/fixtures/*.db
+
+# Build & Release output
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
