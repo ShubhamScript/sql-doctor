@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/sql-doctor/sql-doctor/internal/ai"
@@ -25,6 +26,7 @@ var (
 	flagConn     string
 	flagDBURL    string
 	flagAI       bool
+	flagDatabase string
 
 	appConfig  *config.Config
 	appStorage *storage.Storage
@@ -56,12 +58,15 @@ func init() {
 	RootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "Output results as machine-readable JSON")
 	RootCmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "Enable verbose output and logs")
 	RootCmd.PersistentFlags().StringVarP(&flagConn, "conn", "c", "", "Saved connection profile name to use")
+	RootCmd.PersistentFlags().StringVarP(&flagDatabase, "database", "d", "", "Database name to use for this command")
 	RootCmd.PersistentFlags().StringVar(&flagDBURL, "db-url", "", "Direct database URL or SQLite file path (e.g. postgres://user:pass@localhost:5432/db)")
 	RootCmd.PersistentFlags().BoolVar(&flagAI, "ai", false, "Enable optional AI explanations / recommendations via Gemini")
 
 	// Register subcommands
 	RootCmd.AddCommand(connectCmd)
 	RootCmd.AddCommand(connectionsCmd)
+	RootCmd.AddCommand(useCmd)
+	RootCmd.AddCommand(databasesCmd)
 	RootCmd.AddCommand(pingCmd)
 	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(dbCmd)
@@ -110,15 +115,10 @@ func GetActiveDB(ctx context.Context) (*sql.DB, database.Driver, *database.Conne
 			return nil, nil, nil, err
 		}
 		cfg = c
-	} else {
-		// 2. Check --conn flag or active stored connection
-		targetName := flagConn
-		if targetName == "" && appConfig != nil {
-			targetName = appConfig.ActiveConnName
-		}
-
-		if targetName != "" && appStorage != nil {
-			rec, err := appStorage.GetConnection(ctx, targetName)
+	} else if flagConn != "" {
+		// 2. Check --conn flag explicitly
+		if appStorage != nil {
+			rec, err := appStorage.GetConnection(ctx, flagConn)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -134,10 +134,51 @@ func GetActiveDB(ctx context.Context) (*sql.DB, database.Driver, *database.Conne
 				SSLMode:  rec.SSLMode,
 			}
 		}
+	} else {
+		// 3. Check for active session connection
+		if appStorage != nil {
+			sess, err := appStorage.GetSessionConnection(ctx)
+			if err == nil && sess != nil {
+				cfg = &database.ConnectionConfig{
+					Name:     sess.Name,
+					Dialect:  sess.Dialect,
+					Host:     sess.Host,
+					Port:     sess.Port,
+					User:     sess.User,
+					Password: sess.Password,
+					Database: sess.Database,
+					FilePath: sess.FilePath,
+					SSLMode:  sess.SSLMode,
+				}
+			}
+		}
+
+		// 4. Fallback to active saved connection profile
+		if cfg == nil && appConfig != nil && appConfig.ActiveConnName != "" && appStorage != nil {
+			rec, err := appStorage.GetConnection(ctx, appConfig.ActiveConnName)
+			if err == nil && rec != nil {
+				cfg = &database.ConnectionConfig{
+					Name:     rec.Name,
+					Dialect:  rec.Dialect,
+					Host:     rec.Host,
+					Port:     rec.Port,
+					User:     rec.User,
+					Password: rec.Password,
+					Database: rec.Database,
+					FilePath: rec.FilePath,
+					SSLMode:  rec.SSLMode,
+				}
+			}
+		}
 	}
 
 	if cfg == nil {
 		return nil, nil, nil, fmt.Errorf("no database connection specified.\n\nUse --db-url, --conn, or connect using:\n  sql-doctor connect --type <mysql|postgres|sqlite> ...")
+	}
+
+	// 5. Override database if -d / --database flag is passed
+	if flagDatabase != "" {
+		cfg.Database = flagDatabase
 	}
 
 	db, driver, err := database.OpenConnection(ctx, cfg)
@@ -146,6 +187,55 @@ func GetActiveDB(ctx context.Context) (*sql.DB, database.Driver, *database.Conne
 	}
 
 	return db, driver, cfg, nil
+}
+
+// EnsureDatabase verifies that a database is selected for operations that require one.
+// If not selected, it fetches available databases from the server and returns a helpful error suggestion.
+func EnsureDatabase(ctx context.Context, db *sql.DB, driver database.Driver, cfg *database.ConnectionConfig) error {
+	return formatEnsureDatabase(ctx, db, driver, cfg, false)
+}
+
+// EnsureShellDatabase verifies that a database is selected inside an interactive shell session.
+func EnsureShellDatabase(ctx context.Context, db *sql.DB, driver database.Driver, cfg *database.ConnectionConfig) error {
+	return formatEnsureDatabase(ctx, db, driver, cfg, true)
+}
+
+func formatEnsureDatabase(ctx context.Context, db *sql.DB, driver database.Driver, cfg *database.ConnectionConfig, isShell bool) error {
+	if cfg.Dialect == database.DialectSQLite {
+		return nil
+	}
+	if cfg.Database != "" {
+		return nil
+	}
+
+	dbs, err := driver.Databases(ctx, db)
+	var suggestion strings.Builder
+	suggestion.WriteString(fmt.Sprintf("no database selected for connection '%s'.\n\nThis operation requires an active database.\n", cfg.Name))
+
+	if err == nil && len(dbs) > 0 {
+		suggestion.WriteString("\nAvailable databases on server:\n")
+		limit := len(dbs)
+		if limit > 15 {
+			limit = 15
+		}
+		for i := 0; i < limit; i++ {
+			suggestion.WriteString(fmt.Sprintf("  • %s\n", dbs[i]))
+		}
+		if len(dbs) > 15 {
+			suggestion.WriteString(fmt.Sprintf("  ... and %d more\n", len(dbs)-15))
+		}
+	}
+
+	suggestion.WriteString("\nTo select a database, run:\n")
+	if isShell {
+		suggestion.WriteString("  use <database-name>\n")
+	} else {
+		suggestion.WriteString("  sql-doctor use <database-name>\n")
+		suggestion.WriteString("or specify with flag:\n")
+		suggestion.WriteString("  --database <database-name> (or -d <database-name>)\n")
+	}
+
+	return fmt.Errorf("%s", suggestion.String())
 }
 
 // GetAIProvider returns an initialized Gemini provider

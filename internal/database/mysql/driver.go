@@ -97,6 +97,24 @@ func (d *Driver) Version(ctx context.Context, db *sql.DB) (string, error) {
 	return res, nil
 }
 
+func (d *Driver) Databases(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "SHOW DATABASES;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list databases: %w", err)
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		databases = append(databases, name)
+	}
+	return databases, nil
+}
+
 func (d *Driver) Tables(ctx context.Context, db *sql.DB) ([]database.TableInfo, error) {
 	query := `
 		SELECT 

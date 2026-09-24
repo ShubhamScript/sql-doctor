@@ -414,3 +414,82 @@ func (s *Storage) GetSetting(ctx context.Context, key string) (string, error) {
 	}
 	return val, nil
 }
+
+// SaveSessionConnection saves an ephemeral/session connection
+func (s *Storage) SaveSessionConnection(ctx context.Context, conn *ConnectionRecord) error {
+	data, err := json.Marshal(conn)
+	if err != nil {
+		return err
+	}
+	return s.SetSetting(ctx, "session_connection", string(data))
+}
+
+// GetSessionConnection retrieves the active session connection if any
+func (s *Storage) GetSessionConnection(ctx context.Context) (*ConnectionRecord, error) {
+	val, err := s.GetSetting(ctx, "session_connection")
+	if err != nil || val == "" {
+		return nil, err
+	}
+	var conn ConnectionRecord
+	if err := json.Unmarshal([]byte(val), &conn); err != nil {
+		return nil, err
+	}
+	return &conn, nil
+}
+
+// ClearSessionConnection removes the session connection
+func (s *Storage) ClearSessionConnection(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM settings WHERE key = 'session_connection';")
+	return err
+}
+
+// UpdateConnectionDatabase updates the database name for a specific connection or active connection/session
+func (s *Storage) UpdateConnectionDatabase(ctx context.Context, connName string, databaseName string) (*ConnectionRecord, error) {
+	if connName != "" {
+		rec, err := s.GetConnection(ctx, connName)
+		if err != nil {
+			return nil, err
+		}
+		rec.Database = databaseName
+		_, err = s.db.ExecContext(ctx, "UPDATE connections SET database_name = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?;", databaseName, connName)
+		if err != nil {
+			return nil, err
+		}
+		sess, _ := s.GetSessionConnection(ctx)
+		if sess != nil && sess.Name == connName {
+			sess.Database = databaseName
+			_ = s.SaveSessionConnection(ctx, sess)
+		}
+		return rec, nil
+	}
+
+	// First check if there is an active session connection
+	sess, err := s.GetSessionConnection(ctx)
+	if err == nil && sess != nil {
+		sess.Database = databaseName
+		if err := s.SaveSessionConnection(ctx, sess); err != nil {
+			return nil, err
+		}
+		if sess.Name != "" && sess.Name != "default" && sess.Name != "session" {
+			_, _ = s.db.ExecContext(ctx, "UPDATE connections SET database_name = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?;", databaseName, sess.Name)
+		}
+		return sess, nil
+	}
+
+	// Otherwise update active saved connection in connections table
+	active, err := s.GetActiveConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if active == nil {
+		return nil, fmt.Errorf("no active connection found to update database")
+	}
+
+	active.Database = databaseName
+	_, err = s.db.ExecContext(ctx, "UPDATE connections SET database_name = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?;", databaseName, active.Name)
+	if err != nil {
+		return nil, err
+	}
+	return active, nil
+}
+

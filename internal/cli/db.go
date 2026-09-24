@@ -26,6 +26,10 @@ var dbTablesCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
+
 		tables, err := driver.Tables(ctx, db)
 		if err != nil {
 			return fmt.Errorf("failed to fetch tables: %w", err)
@@ -56,11 +60,15 @@ var dbDescribeCmd = &cobra.Command{
 		ctx := cmd.Context()
 		tableName := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		detail, err := driver.DescribeTable(ctx, db, tableName)
 		if err != nil {
@@ -106,11 +114,15 @@ var dbIndexesCmd = &cobra.Command{
 		ctx := cmd.Context()
 		tableName := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		indexes, err := driver.Indexes(ctx, db, tableName)
 		if err != nil {
@@ -134,11 +146,15 @@ var dbRelationshipsCmd = &cobra.Command{
 	Short: "Show foreign keys, inferred relationships, and orphan records",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		rels, err := driver.Relationships(ctx, db)
 		if err != nil {
@@ -308,6 +324,10 @@ var dbSnapshotCmd = &cobra.Command{
 			}
 			defer db.Close()
 
+			if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+				return err
+			}
+
 			mgr := schema.NewSnapshotManager(appStorage, driver)
 			snap, err := mgr.CreateSnapshot(ctx, db, name, cfg.Name, cfg.Database)
 			if err != nil {
@@ -325,6 +345,8 @@ var dbSnapshotCmd = &cobra.Command{
 }
 
 func init() {
+	dbCmd.AddCommand(useCmd)
+	dbCmd.AddCommand(databasesCmd)
 	dbCmd.AddCommand(dbTablesCmd)
 	dbCmd.AddCommand(dbDescribeCmd)
 	dbCmd.AddCommand(dbIndexesCmd)

@@ -24,6 +24,7 @@ As a software developer, I built SQL Doctor to solve the common database problem
 - **Dealing with poorly chosen data types or oversized columns** — SQL Doctor inspects your actual data records and recommends better, more compact definitions based on real statistics.
 - **Worrying about what could break when applying a migration** — SQL Doctor checks for potential data loss, table locks, and compatibility issues beforehand.
 - **Knowing something is wrong with a database but not knowing where** — SQL Doctor runs a full diagnostic across schema health, performance, indexes, data quality, and referential integrity.
+- **Wanting an interactive terminal environment without typing `sql-doctor` before every command** — SQL Doctor includes an interactive REPL shell with engine selection, database switching, direct SQL execution, and clean box table rendering.
 
 It gives you clear, deterministic answers straight in your terminal without needing heavy GUI clients or cloud dashboards. And if you want conversational assistance, you can optionally connect your own Gemini API key for query explanations and natural-language query generation.
 
@@ -87,29 +88,71 @@ To use it from anywhere on Windows, add the folder containing `sql-doctor.exe` t
 
 ## 🚀 Everyday Usage & Examples
 
-### 1. Connecting to a Database
-SQL Doctor works out of the box with **MySQL**, **MariaDB**, **PostgreSQL**, and **SQLite**.
+### 1. Interactive Shell REPL (`shell`)
+If you prefer an interactive environment like the `mysql` or `psql` CLI where you can type queries and inspect schemas without prefixing every command with `sql-doctor`:
 
 ```bash
-# SQLite (Local file)
+# Launch interactive shell with database engine picker
+sql-doctor shell
+
+# Or jump straight into a specific connection / database:
+sql-doctor shell -c local-mysql -d rolerift
+```
+
+Inside the shell, your prompt reflects your active engine and database:
+```text
+sql-doctor [mysql@rolerift]> tables
+sql-doctor [mysql@rolerift]> select * from users;
+sql-doctor [mysql@rolerift]> select * from users\G   # Vertical format (one column per line)
+sql-doctor [mysql@rolerift]> use shop_db             # Switch database on the fly
+sql-doctor [mysql@shop_db]> analyze SELECT * FROM orders WHERE status = 'pending'
+sql-doctor [mysql@shop_db]> help                    # View categorized commands
+sql-doctor [mysql@shop_db]> exit                    # Clean exit (discards in-memory session)
+```
+
+All session state (active connection and selected database) lives in memory during your shell session and is cleanly discarded upon exit.
+
+---
+
+### 2. Connecting to a Database
+SQL Doctor works out of the box with **MySQL**, **MariaDB**, **PostgreSQL**, and **SQLite**.
+
+Specifying a database name upfront is completely optional. If you connect to a server without picking a database, you can select one later:
+
+```bash
+# Connect to MySQL / MariaDB (specifying a database is optional)
+sql-doctor connect --type mysql --host 127.0.0.1 --port 3306 --user root -p
+
+# Connect to PostgreSQL
+sql-doctor connect --type postgres --host localhost --port 5432 --user postgres -p
+
+# Connect to SQLite (local file)
 sql-doctor connect --type sqlite --file ./my-app.db --name my-local-db --save
-
-# PostgreSQL
-sql-doctor connect --type postgres --host localhost --port 5432 --user postgres --password mysecret --database shop_db --name local-pg --save
-
-# MySQL / MariaDB
-sql-doctor connect --type mysql --host 127.0.0.1 --port 3306 --user root --password mysecret --database shop_db --name local-mysql --save
 
 # Or run directly against a database URL without saving:
 sql-doctor --db-url "postgres://user:pass@localhost:5432/shop_db" db tables
 ```
 
-To see your saved connections or switch between them:
+> **Tip:** You don't need `--save` just to try a connection. Running `connect` without `--save` starts an ephemeral session so you can immediately run subsequent commands in that terminal.
+
+#### Managing Databases on the Server:
 ```bash
-# List saved connections
+# List all databases on the connected server
+sql-doctor databases
+
+# Switch the active database
+sql-doctor use rolerift
+
+# Clear session memory
+sql-doctor disconnect
+```
+
+To see your saved connection profiles or switch between them:
+```bash
+# List saved connection profiles
 sql-doctor connections
 
-# Switch active connection
+# Switch active profile
 sql-doctor connections --use local-pg
 
 # Quick connectivity test
@@ -118,7 +161,7 @@ sql-doctor ping
 
 ---
 
-### 2. Full Health Diagnostic (`doctor`)
+### 3. Full Health Diagnostic (`doctor`)
 Run a quick diagnostic across your whole database. It checks for tables missing primary keys, unindexed foreign keys, redundant indexes, and sampled data anomalies:
 
 ```bash
@@ -142,7 +185,7 @@ Warnings:
 
 ---
 
-### 3. Query Performance & EXPLAIN Analysis
+### 4. Query Performance & EXPLAIN Analysis
 Profile slow queries to see execution time, rows examined vs returned, and unindexed table scans:
 
 ```bash
@@ -158,7 +201,7 @@ sql-doctor query optimize "SELECT * FROM users WHERE status = 'active' AND age >
 
 ---
 
-### 4. Data-Aware Datatype Advisor
+### 5. Data-Aware Datatype Advisor
 Don't guess what column type you should have used. SQL Doctor samples actual records and checks value lengths, patterns (like UUIDs, ISO dates, and booleans), and recommends tighter types:
 
 ```bash
@@ -176,7 +219,7 @@ INFO  Column 'user_uuid'
 
 ---
 
-### 5. Checking Foreign Keys & Orphan Rows
+### 6. Checking Foreign Keys & Orphan Rows
 Find broken referential integrity before your app hits a foreign key error:
 
 ```bash
@@ -187,7 +230,7 @@ This lists all foreign keys (plus inferred relationships like `user_id -> users.
 
 ---
 
-### 6. Comparing Two Database Schemas (`diff`)
+### 7. Comparing Two Database Schemas (`diff`)
 Need to verify if your staging database matches production?
 
 ```bash
@@ -198,7 +241,7 @@ This compares tables, columns, data types, nullability, defaults, and indexes, a
 
 ---
 
-### 7. Migration Safety Checks
+### 8. Migration Safety Checks
 Before running a migration script on production, check it for destructive commands or locking hazards:
 
 ```bash
@@ -212,7 +255,7 @@ Catches issues like:
 
 ---
 
-### 8. SQL Linter & Formatter
+### 9. SQL Linter & Formatter
 Quick static checks without needing a live connection:
 
 ```bash
@@ -225,7 +268,7 @@ sql-doctor format "select id,name from users where status='active' and age>21 or
 
 ---
 
-### 9. Optional Gemini AI Assistant
+### 10. Optional Gemini AI Assistant
 If you want AI explanations or natural-language query generation, add your own Gemini API key:
 
 ```bash
@@ -244,7 +287,7 @@ sql-doctor ask "Write a query to find the top 5 customers by revenue this year"
 
 ---
 
-### 10. Machine-Readable Output (`--json`)
+### 11. Machine-Readable Output (`--json`)
 Every single command supports the `--json` flag. You can pipe the output into `jq` or plug it into your CI/CD pipelines:
 
 ```bash

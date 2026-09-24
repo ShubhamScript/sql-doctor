@@ -67,6 +67,27 @@ func (d *Driver) Version(ctx context.Context, db *sql.DB) (string, error) {
 	return "SQLite " + ver, nil
 }
 
+func (d *Driver) Databases(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "PRAGMA database_list;")
+	if err != nil {
+		return []string{"main"}, nil
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var seq int
+		var name, file string
+		if err := rows.Scan(&seq, &name, &file); err == nil {
+			databases = append(databases, name)
+		}
+	}
+	if len(databases) == 0 {
+		return []string{"main"}, nil
+	}
+	return databases, nil
+}
+
 func (d *Driver) Tables(ctx context.Context, db *sql.DB) ([]database.TableInfo, error) {
 	query := `
 		SELECT name, type 

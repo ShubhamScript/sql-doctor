@@ -34,6 +34,10 @@ var doctorCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
+
 		ver, _ := driver.Version(ctx, db)
 
 		report := &DoctorReport{

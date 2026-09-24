@@ -50,7 +50,7 @@ sql-doctor/
 │   ├── config/
 │   │   └── config.go                # Env vars & configuration loader
 │   ├── ui/                          # Lip Gloss styling, scorecards, tables
-│   └── cli/                         # Cobra commands & flag handlers
+│   └── cli/                         # Cobra commands, shell REPL & flag handlers
 ├── tests/
 │   ├── fixtures/                    # Test schemas and migration files
 │   └── unit/                        # Unit tests
@@ -138,6 +138,7 @@ type Driver interface {
     Connect(ctx context.Context, cfg *ConnectionConfig) (*sql.DB, error)
     Ping(ctx context.Context, db *sql.DB) error
     Version(ctx context.Context, db *sql.DB) (string, error)
+    Databases(ctx context.Context, db *sql.DB) ([]string, error)
     Tables(ctx context.Context, db *sql.DB) ([]TableInfo, error)
     DescribeTable(ctx context.Context, db *sql.DB, table string) (*TableDetail, error)
     Indexes(ctx context.Context, db *sql.DB, table string) ([]IndexInfo, error)

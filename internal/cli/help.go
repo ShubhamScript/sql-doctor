@@ -70,6 +70,7 @@ func renderRootHelp() string {
 		desc  string
 	}{
 		{"-c, --conn <name>", "Saved connection profile name to use"},
+		{"-d, --database <db>", "Target database name to use for this command"},
 		{"    --db-url <url>", "Direct database URL or SQLite file path"},
 		{"    --ai", "Enable optional AI recommendations via Gemini"},
 		{"    --json", "Output results as machine-readable JSON"},
@@ -95,8 +96,12 @@ func renderRootHelp() string {
 		desc string
 	}{
 		{"doctor", "Run full end-to-end database health check"},
+		{"shell", "Open interactive query REPL console (MySQL-like)"},
 		{"connect", "Create and test a new database connection"},
 		{"connections", "List, inspect, and manage saved database connections"},
+		{"use <database>", "Select or switch active database for current connection"},
+		{"databases", "List all databases on target connection"},
+		{"disconnect", "Disconnect and clear ephemeral session memory"},
 		{"ping", "Quick connectivity test to target database"},
 		{"lint", "Lint SQL query files against anti-pattern rules"},
 		{"format", "Format SQL queries with standard indentation"},
@@ -119,6 +124,8 @@ func renderRootHelp() string {
 		{
 			group: "db",
 			cmds: []struct{ name, desc string }{
+				{"db use <database>", "Select or switch active database"},
+				{"db databases", "List all databases on target connection"},
 				{"db tables", "List all tables in connected database"},
 				{"db describe <table>", "Show column types, nullability, keys, and defaults"},
 				{"db indexes <table>", "List table indexes, column order, and uniqueness"},
@@ -187,7 +194,15 @@ func renderRootHelp() string {
 func renderSubcommandHelp(cmd *cobra.Command) string {
 	var b strings.Builder
 
+	// Header (ASCII Art Logo + Badge)
 	b.WriteString("\n")
+	b.WriteString(styleLogo.Render(AsciiLogo))
+	b.WriteString("\n\n")
+
+	badge := styleBadge.Render("SQL DOCTOR")
+	ver := styleVer.Render("v0.1.0-beta")
+	subtitle := styleGray.Render("— Database Diagnostics & SQL Intelligence CLI")
+	b.WriteString(fmt.Sprintf("  %s  %s  %s\n\n", badge, ver, subtitle))
 
 	// 1. Usage
 	b.WriteString(styleYellow.Render("Usage:"))
