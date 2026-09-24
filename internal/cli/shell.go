@@ -12,10 +12,12 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	aiContext "github.com/sql-doctor/sql-doctor/internal/ai/context"
 	"github.com/sql-doctor/sql-doctor/internal/database"
 	"github.com/sql-doctor/sql-doctor/internal/query/analyzer"
 	"github.com/sql-doctor/sql-doctor/internal/query/explain"
 	"github.com/sql-doctor/sql-doctor/internal/query/optimizer"
+	"github.com/sql-doctor/sql-doctor/internal/schema"
 	"github.com/sql-doctor/sql-doctor/internal/storage"
 	"github.com/sql-doctor/sql-doctor/internal/ui"
 	"golang.org/x/term"
@@ -654,6 +656,58 @@ func handleShellCommand(ctx context.Context, session *ShellSession, line string)
 			return err
 		}
 		fmt.Println(ui.Success("Database '%s' is responsive. Total tables: %d", session.Config.Database, len(tables)))
+		return nil
+
+	case "ask":
+		if len(parts) < 2 {
+			return fmt.Errorf("usage: ask <natural language prompt or query request>")
+		}
+		question := strings.TrimPrefix(trimmed, parts[0]+" ")
+		if err := EnsureShellDatabase(ctx, session.DB, session.Driver, session.Config); err != nil {
+			return err
+		}
+		p := GetAIProvider()
+		if !p.IsConfigured() {
+			fmt.Println(ui.Warning("AI features are unavailable because %s is not configured.", p.ProviderName()))
+			fmt.Println("\nConfigure your AI provider outside the shell using:")
+			fmt.Println("  sql-doctor config ai")
+			return nil
+		}
+		fmt.Println(ui.Info("Thinking with %s (%s)...", p.ProviderName(), p.Model()))
+		tables, _ := session.Driver.Tables(ctx, session.DB)
+		details, _ := schema.FetchAllTableDetails(ctx, session.Driver, session.DB)
+		schemaContext := aiContext.BuildMinifiedSchema(tables, details)
+
+		lowerQ := strings.ToLower(question)
+		isQueryGen := strings.HasPrefix(lowerQ, "write") || strings.HasPrefix(lowerQ, "generate") ||
+			strings.HasPrefix(lowerQ, "find") || strings.HasPrefix(lowerQ, "select") ||
+			strings.HasPrefix(lowerQ, "get") || strings.Contains(lowerQ, "query to")
+
+		if isQueryGen {
+			genSQL, err := p.GenerateSQL(ctx, question, schemaContext)
+			if err != nil {
+				return err
+			}
+			fmt.Println()
+			fmt.Println(ui.HeaderStyle.Render("Generated SQL Query:"))
+			fmt.Println(ui.CardStyle.Render(genSQL.SQL))
+			if genSQL.Explanation != "" {
+				fmt.Printf("Explanation: %s\n", genSQL.Explanation)
+			}
+			if genSQL.IsDestructive {
+				fmt.Println(ui.CriticalBadge + " " + ui.Error("Warning: This query modifies or deletes data!"))
+			}
+			fmt.Println()
+			fmt.Println(ui.Info("Tip: Copy and paste the query above to execute it."))
+			return nil
+		}
+
+		ans, err := p.Ask(ctx, question, schemaContext)
+		if err != nil {
+			return err
+		}
+		fmt.Println()
+		fmt.Println(ans)
 		return nil
 
 	case "help", "?":

@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/sql-doctor/sql-doctor/internal/ai"
-	"github.com/sql-doctor/sql-doctor/internal/ai/gemini"
 	"github.com/sql-doctor/sql-doctor/internal/config"
 	"github.com/sql-doctor/sql-doctor/internal/database"
 	"github.com/sql-doctor/sql-doctor/internal/database/mysql"
@@ -238,14 +237,12 @@ func formatEnsureDatabase(ctx context.Context, db *sql.DB, driver database.Drive
 	return fmt.Errorf("%s", suggestion.String())
 }
 
-// GetAIProvider returns an initialized Gemini provider
+// GetAIProvider returns an initialized AI provider based on active configuration
 func GetAIProvider() ai.AIProvider {
-	var key, model string
-	if appConfig != nil {
-		key = appConfig.GeminiKey
-		model = appConfig.GeminiModel
+	if appConfig == nil {
+		return NewAIProvider(ai.ProviderParams{})
 	}
-	return gemini.New(key, model)
+	return NewAIProvider(appConfig.ActiveAIParams())
 }
 
 // OutputResult renders data as either JSON or passes to a terminal printer

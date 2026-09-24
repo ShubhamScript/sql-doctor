@@ -268,20 +268,34 @@ sql-doctor format "select id,name from users where status='active' and age>21 or
 
 ---
 
-### 10. Optional Gemini AI Assistant
-If you want AI explanations or natural-language query generation, add your own Gemini API key:
+### 10. Multi-Model AI Assistant (Gemini, OpenAI, Claude, Ollama)
+If you want AI explanations or natural-language query generation, SQL Doctor supports **Google Gemini**, **OpenAI (ChatGPT)**, **Anthropic Claude**, and **Ollama / Local LLMs** (OpenAI-compatible):
 
 ```bash
-# Configure your API key
-sql-doctor config set-ai-key <your-api-key>
-
-# Verify configuration
+# Open the interactive AI configuration dashboard
 sql-doctor config ai
 
-# Ask questions grounded in your schema
+# Or switch provider and model directly:
+sql-doctor config ai switch openai gpt-4o-mini
+sql-doctor config ai switch claude claude-3-5-haiku-20241022
+sql-doctor config ai switch gemini gemini-3.8-flash
+sql-doctor config ai switch ollama deepseek-r1:8b
+
+# Configure API keys (prompts with masked input if key omitted):
+sql-doctor config ai set-key openai
+sql-doctor config ai set-key claude
+sql-doctor config ai set-key gemini
+
+# Set custom endpoint for Ollama / local models:
+sql-doctor config ai set-endpoint http://localhost:11434/v1
+
+# Test connection and latency:
+sql-doctor config ai test
+
+# Ask questions grounded in your schema:
 sql-doctor ask "Which tables store customer billing records?"
 
-# Generate queries
+# Generate queries (with interactive execution prompt):
 sql-doctor ask "Write a query to find the top 5 customers by revenue this year"
 ```
 

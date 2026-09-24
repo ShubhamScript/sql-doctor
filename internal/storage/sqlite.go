@@ -415,6 +415,12 @@ func (s *Storage) GetSetting(ctx context.Context, key string) (string, error) {
 	return val, nil
 }
 
+// DeleteSetting removes a persistent configuration setting
+func (s *Storage) DeleteSetting(ctx context.Context, key string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM settings WHERE key = ?;", key)
+	return err
+}
+
 // SaveSessionConnection saves an ephemeral/session connection
 func (s *Storage) SaveSessionConnection(ctx context.Context, conn *ConnectionRecord) error {
 	data, err := json.Marshal(conn)

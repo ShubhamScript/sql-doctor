@@ -20,7 +20,7 @@ var (
 
 var askCmd = &cobra.Command{
 	Use:   "ask \"<question or natural language request>\"",
-	Short: "Ask questions about your database or generate SQL using Gemini AI",
+	Short: "Ask questions about your database or generate SQL using AI",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -28,11 +28,11 @@ var askCmd = &cobra.Command{
 
 		provider := GetAIProvider()
 		if !provider.IsConfigured() {
-			fmt.Println(ui.Warning("AI features are unavailable because a Gemini API key has not been configured."))
-			fmt.Println("\nConfigure your own key using:")
-			fmt.Println("  sql-doctor config set-ai-key <your-api-key>")
-			fmt.Println("or set the environment variable:")
-			fmt.Println("  export GEMINI_API_KEY=\"...\"")
+			fmt.Println(ui.Warning("AI features are unavailable because %s is not configured.", provider.ProviderName()))
+			fmt.Println("\nConfigure your AI provider and credentials using:")
+			fmt.Println("  sql-doctor config ai")
+			fmt.Println("or switch provider:")
+			fmt.Println("  sql-doctor config ai switch <gemini|openai|claude|ollama>")
 			return nil
 		}
 
@@ -58,7 +58,7 @@ var askCmd = &cobra.Command{
 			strings.HasPrefix(lowerPrompt, "get") || strings.Contains(lowerPrompt, "query to")
 
 		if isQueryGen {
-			fmt.Println(ui.Info("Generating SQL with Gemini %s...", provider.Model()))
+			fmt.Println(ui.Info("Generating SQL with %s (%s)...", provider.ProviderName(), provider.Model()))
 			generated, err := provider.GenerateSQL(ctx, prompt, schemaContext)
 			if err != nil {
 				return err
@@ -112,7 +112,7 @@ var askCmd = &cobra.Command{
 		}
 
 		// Conversational Question
-		fmt.Println(ui.Info("Consulting Gemini %s...", provider.Model()))
+		fmt.Println(ui.Info("Consulting %s (%s)...", provider.ProviderName(), provider.Model()))
 		answer, err := provider.Ask(ctx, prompt, schemaContext)
 		if err != nil {
 			return err
