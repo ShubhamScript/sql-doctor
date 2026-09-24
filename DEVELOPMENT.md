@@ -42,8 +42,11 @@ sql-doctor/
 │   ├── migration/
 │   │   └── analyzer.go              # Migration lock risk & destructive check
 │   ├── ai/
-│   │   ├── provider.go              # AIProvider interface
+│   │   ├── provider.go              # AIProvider interface & curated models
+│   │   ├── base.go                  # BaseProvider & shared prompt templates
 │   │   ├── gemini/                  # Google GenAI SDK client
+│   │   ├── openai/                  # OpenAI & Ollama/local LLM client
+│   │   ├── claude/                  # Anthropic Claude Messages API client
 │   │   └── context/                 # Schema context minifier & prompt builder
 │   ├── storage/
 │   │   └── sqlite.go                # Local SQLite state repo (~/.sql-doctor/)
