@@ -42,6 +42,10 @@ var askCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
+
 		fmt.Println(ui.Info("Inspecting schema context for [%s]...", cfg.Database))
 		tables, _ := driver.Tables(ctx, db)
 		details, _ := schema.FetchAllTableDetails(ctx, driver, db)

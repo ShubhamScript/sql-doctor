@@ -40,7 +40,11 @@ func (d *Driver) DSN(cfg *database.ConnectionConfig) string {
 	if cfg.Password != "" {
 		auth += ":" + cfg.Password
 	}
-	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s", auth, host, port, cfg.Database, sslMode)
+	dbName := cfg.Database
+	if dbName == "" {
+		dbName = "postgres"
+	}
+	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s", auth, host, port, dbName, sslMode)
 }
 
 func (d *Driver) Connect(ctx context.Context, cfg *database.ConnectionConfig) (*sql.DB, error) {
@@ -80,6 +84,30 @@ func (d *Driver) Version(ctx context.Context, db *sql.DB) (string, error) {
 		return "", err
 	}
 	return ver, nil
+}
+
+func (d *Driver) Databases(ctx context.Context, db *sql.DB) ([]string, error) {
+	query := `
+		SELECT datname 
+		FROM pg_database 
+		WHERE datistemplate = false 
+		ORDER BY datname ASC;
+	`
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list databases: %w", err)
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		databases = append(databases, name)
+	}
+	return databases, nil
 }
 
 func (d *Driver) Tables(ctx context.Context, db *sql.DB) ([]database.TableInfo, error) {

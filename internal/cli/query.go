@@ -34,6 +34,10 @@ var queryAnalyzeCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
+
 		anz := analyzer.NewAnalyzer(driver)
 		result, err := anz.Analyze(ctx, db, queryText)
 		if err != nil {
@@ -124,11 +128,15 @@ var queryExplainCmd = &cobra.Command{
 		ctx := cmd.Context()
 		queryText := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		explainRes, err := driver.Explain(ctx, db, queryText, false)
 		if err != nil {
@@ -169,11 +177,15 @@ var queryOptimizeCmd = &cobra.Command{
 		ctx := cmd.Context()
 		queryText := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		opt := optimizer.NewOptimizer(driver)
 		res, err := opt.Optimize(ctx, db, queryText)

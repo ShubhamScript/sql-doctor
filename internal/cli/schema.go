@@ -19,11 +19,15 @@ var schemaAnalyzeCmd = &cobra.Command{
 	Short: "Analyze schema design smells, missing PKs, unindexed foreign keys",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		analyzer := schema.NewSchemaAnalyzer(driver)
 		report, err := analyzer.Analyze(ctx, db)
@@ -94,11 +98,15 @@ var schemaDatatypesCmd = &cobra.Command{
 		ctx := cmd.Context()
 		tableName := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		advisor := schema.NewAdvisor(driver)
 		recs, err := advisor.AnalyzeTable(ctx, db, tableName)

@@ -21,11 +21,15 @@ var dataQualityCmd = &cobra.Command{
 		ctx := cmd.Context()
 		tableName := args[0]
 
-		db, driver, _, err := GetActiveDB(ctx)
+		db, driver, cfg, err := GetActiveDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
+
+		if err := EnsureDatabase(ctx, db, driver, cfg); err != nil {
+			return err
+		}
 
 		analyzer := data.NewQualityAnalyzer(driver)
 		report, err := analyzer.AnalyzeTable(ctx, db, tableName)
