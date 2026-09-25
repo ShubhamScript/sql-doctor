@@ -10,6 +10,7 @@ import (
 
 	"github.com/sql-doctor/sql-doctor/internal/ai"
 	"github.com/sql-doctor/sql-doctor/internal/ai/claude"
+	"github.com/sql-doctor/sql-doctor/internal/ai/gemini"
 	"github.com/sql-doctor/sql-doctor/internal/ai/openai"
 	"github.com/sql-doctor/sql-doctor/internal/cli"
 	"github.com/sql-doctor/sql-doctor/internal/config"
@@ -103,6 +104,44 @@ func TestOpenAIClientMock(t *testing.T) {
 	defer server.Close()
 
 	client := openai.New("test-secret", "gpt-4o-mini", server.URL, false)
+	if err := client.TestConnection(ctx); err != nil {
+		t.Fatalf("TestConnection failed: %v", err)
+	}
+}
+
+func TestGeminiClientMock(t *testing.T) {
+	ctx := context.Background()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-goog-api-key") != "gemini-test-secret" {
+			t.Errorf("missing or invalid x-goog-api-key header")
+		}
+
+		resp := map[string]interface{}{
+			"candidates": []map[string]interface{}{
+				{
+					"content": map[string]interface{}{
+						"role": "model",
+						"parts": []map[string]interface{}{
+							{
+								"text":    "Thinking through...",
+								"thought": true,
+							},
+							{
+								"text":    "PONG",
+								"thought": false,
+							},
+						},
+					},
+					"finishReason": "STOP",
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := gemini.NewWithEndpoint("gemini-test-secret", "gemini-3.8-flash", server.URL)
 	if err := client.TestConnection(ctx); err != nil {
 		t.Fatalf("TestConnection failed: %v", err)
 	}

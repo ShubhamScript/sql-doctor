@@ -105,6 +105,7 @@ func renderRootHelp() string {
 		{"ping", "Quick connectivity test to target database"},
 		{"lint", "Lint SQL query files against anti-pattern rules"},
 		{"format", "Format SQL queries with standard indentation"},
+		{"diff <connA> <connB>", "Compare schemas between two database connections"},
 		{"ask", "Ask database questions or generate SQL using Gemini AI"},
 		{"completion", "Generate shell autocompletion script"},
 	}
