@@ -216,7 +216,7 @@ func printShellHelp(args ...string) {
 			fmt.Println(descStyle.Render("Switch active database for the current connection (in-memory session only)."))
 			fmt.Println()
 			fmt.Println(syntaxStyle.Render("Syntax:") + "  use <database-name>")
-			fmt.Println(exampleStyle.Render("Example:") + " use rolerift")
+			fmt.Println(exampleStyle.Render("Example:") + " use <database_name>")
 
 		case "databases", "dbs":
 			fmt.Println(sectionStyle.Render("COMMAND: databases (or dbs)"))
@@ -262,6 +262,15 @@ func printShellHelp(args ...string) {
 			fmt.Println(descStyle.Render("Map explicit foreign keys and detect naming-based inferred relationships."))
 			fmt.Println()
 			fmt.Println(syntaxStyle.Render("Syntax:") + "  relationships")
+
+		case "diff":
+			fmt.Println(sectionStyle.Render("COMMAND: diff"))
+			fmt.Println(descStyle.Render("Compare schemas between the active database and another connection profile (or two profiles)."))
+			fmt.Println()
+			fmt.Println(syntaxStyle.Render("Syntax:") + "  diff <target-profile>  (compare current database against target)")
+			fmt.Println(syntaxStyle.Render("   or:") + "    diff <profileA> <profileB>")
+			fmt.Println(exampleStyle.Render("Example:") + " diff staging")
+			fmt.Println(exampleStyle.Render("Example:") + " diff prod-db staging-db")
 
 		case "analyze":
 			fmt.Println(sectionStyle.Render("COMMAND: analyze"))
@@ -342,6 +351,7 @@ func printShellHelp(args ...string) {
 		{"describe (or desc) <table>", "Inspect table columns, types, nullability, keys, and defaults"},
 		{"indexes <table>", "List table indexes, uniqueness, and composite column orders"},
 		{"relationships", "Inspect detected foreign keys and inferred relationships"},
+		{"diff <targetProfile>", "Compare active database schema against another connection profile"},
 	})
 
 	printCategory("PERFORMANCE & DIAGNOSTICS", [][2]string{
@@ -361,7 +371,7 @@ func printShellHelp(args ...string) {
 	})
 
 	fmt.Println(sectionStyle.Render("EXAMPLES"))
-	fmt.Printf("  %s\n", exampleStyle.Render("sql-doctor> use rolerift"))
+	fmt.Printf("  %s\n", exampleStyle.Render("sql-doctor> use <database_name>"))
 	fmt.Printf("  %s\n", exampleStyle.Render("sql-doctor> tables"))
 	fmt.Printf("  %s\n", exampleStyle.Render("sql-doctor> select * from users\\G"))
 	fmt.Printf("  %s\n", exampleStyle.Render("sql-doctor> analyze SELECT * FROM users WHERE email = 'test@example.com'"))
@@ -656,6 +666,146 @@ func handleShellCommand(ctx context.Context, session *ShellSession, line string)
 			return err
 		}
 		fmt.Println(ui.Success("Database '%s' is responsive. Total tables: %d", session.Config.Database, len(tables)))
+		return nil
+
+	case "diff":
+		if len(parts) < 2 {
+			return fmt.Errorf("usage: diff <target-profile> OR diff <profileA> <profileB>")
+		}
+		if appStorage == nil {
+			return fmt.Errorf("local storage unavailable")
+		}
+
+		var (
+			connAName string
+			connBName string
+			detailsA  map[string]*database.TableDetail
+			detailsB  map[string]*database.TableDetail
+		)
+
+		if len(parts) == 2 {
+			if err := EnsureShellDatabase(ctx, session.DB, session.Driver, session.Config); err != nil {
+				return err
+			}
+			connAName = session.Config.Name
+			if connAName == "" {
+				connAName = session.Config.Database
+			}
+			connBName = parts[1]
+
+			fmt.Println(ui.Info("Fetching schema for active database [%s]...", session.Config.Database))
+			dA, err := schema.FetchAllTableDetails(ctx, session.Driver, session.DB)
+			if err != nil {
+				return fmt.Errorf("failed to fetch schema for active database: %w", err)
+			}
+			detailsA = dA
+
+			recB, err := appStorage.GetConnection(ctx, connBName)
+			if err != nil {
+				return fmt.Errorf("connection profile '%s' not found: %w", connBName, err)
+			}
+			dbB, driverB, err := database.OpenConnection(ctx, &database.ConnectionConfig{
+				Dialect:  recB.Dialect,
+				Host:     recB.Host,
+				Port:     recB.Port,
+				User:     recB.User,
+				Password: recB.Password,
+				Database: recB.Database,
+				FilePath: recB.FilePath,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to connect to '%s': %w", connBName, err)
+			}
+			defer dbB.Close()
+
+			fmt.Println(ui.Info("Fetching schema for [%s]...", connBName))
+			dB, err := schema.FetchAllTableDetails(ctx, driverB, dbB)
+			if err != nil {
+				return fmt.Errorf("failed to fetch schema for '%s': %w", connBName, err)
+			}
+			detailsB = dB
+		} else {
+			connAName = parts[1]
+			connBName = parts[2]
+
+			recA, err := appStorage.GetConnection(ctx, connAName)
+			if err != nil {
+				return fmt.Errorf("connection profile '%s' not found: %w", connAName, err)
+			}
+			dbA, driverA, err := database.OpenConnection(ctx, &database.ConnectionConfig{
+				Dialect:  recA.Dialect,
+				Host:     recA.Host,
+				Port:     recA.Port,
+				User:     recA.User,
+				Password: recA.Password,
+				Database: recA.Database,
+				FilePath: recA.FilePath,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to connect to '%s': %w", connAName, err)
+			}
+			defer dbA.Close()
+
+			recB, err := appStorage.GetConnection(ctx, connBName)
+			if err != nil {
+				return fmt.Errorf("connection profile '%s' not found: %w", connBName, err)
+			}
+			dbB, driverB, err := database.OpenConnection(ctx, &database.ConnectionConfig{
+				Dialect:  recB.Dialect,
+				Host:     recB.Host,
+				Port:     recB.Port,
+				User:     recB.User,
+				Password: recB.Password,
+				Database: recB.Database,
+				FilePath: recB.FilePath,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to connect to '%s': %w", connBName, err)
+			}
+			defer dbB.Close()
+
+			fmt.Println(ui.Info("Fetching schema for [%s]...", connAName))
+			dA, err := schema.FetchAllTableDetails(ctx, driverA, dbA)
+			if err != nil {
+				return err
+			}
+			detailsA = dA
+
+			fmt.Println(ui.Info("Fetching schema for [%s]...", connBName))
+			dB, err := schema.FetchAllTableDetails(ctx, driverB, dbB)
+			if err != nil {
+				return err
+			}
+			detailsB = dB
+		}
+
+		diffEngine := schema.NewDiffEngine()
+		diff := diffEngine.Compare(detailsA, detailsB)
+		diff.SourceSchema = connAName
+		diff.TargetSchema = connBName
+
+		fmt.Println()
+		fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("Schema Diff: [%s] vs [%s]", connAName, connBName)))
+		if len(diff.Differences) == 0 {
+			fmt.Println(ui.Success("Schemas are identical! No differences found."))
+			return nil
+		}
+
+		fmt.Printf("Total Differences: %d\n\n", diff.TotalDiffs)
+		tbl := ui.NewTable("ACTION", "TYPE", "OBJECT", "DETAILS")
+		for _, item := range diff.Differences {
+			actionBadge := item.Action
+			switch item.Action {
+			case "ADDED":
+				actionBadge = ui.SuccessBadge + " ADDED"
+			case "REMOVED":
+				actionBadge = ui.CriticalBadge + " REMOVED"
+			case "MODIFIED":
+				actionBadge = ui.WarningBadge + " MODIFIED"
+			}
+			tbl.AddRow(actionBadge, item.Type, item.ObjectName, item.Details)
+		}
+		fmt.Println(tbl.Render())
 		return nil
 
 	case "ask":

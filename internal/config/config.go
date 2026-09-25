@@ -100,6 +100,12 @@ func LoadConfig(ctx context.Context, store *storage.Storage) (*Config, error) {
 			cfg.GeminiModel = storedModel
 		}
 	}
+	if cfg.GeminiModel == "gemini-2.5-flash" || cfg.GeminiModel == "gemini-1.5-flash" || cfg.GeminiModel == "gemini-1.5-pro" {
+		cfg.GeminiModel = "gemini-3.8-flash"
+		if store != nil {
+			_ = store.SetSetting(ctx, "gemini_model", "gemini-3.8-flash")
+		}
+	}
 
 	// 3. OpenAI
 	if envKey := os.Getenv("OPENAI_API_KEY"); envKey != "" {

@@ -186,6 +186,15 @@ var dbRelationshipsCmd = &cobra.Command{
 	},
 }
 
+var diffCmd = &cobra.Command{
+	Use:   "diff <connA> <connB>",
+	Short: "Compare schemas between two database connections or snapshots",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return dbDiffCmd.RunE(cmd, args)
+	},
+}
+
 var dbDiffCmd = &cobra.Command{
 	Use:   "diff <connA> <connB>",
 	Short: "Compare schemas between two database connections or snapshots",

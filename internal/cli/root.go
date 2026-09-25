@@ -68,6 +68,7 @@ func init() {
 	RootCmd.AddCommand(databasesCmd)
 	RootCmd.AddCommand(pingCmd)
 	RootCmd.AddCommand(configCmd)
+	RootCmd.AddCommand(diffCmd)
 	RootCmd.AddCommand(dbCmd)
 	RootCmd.AddCommand(queryCmd)
 	RootCmd.AddCommand(schemaCmd)

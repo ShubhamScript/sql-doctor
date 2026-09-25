@@ -96,18 +96,18 @@ If you prefer an interactive environment like the `mysql` or `psql` CLI where yo
 sql-doctor shell
 
 # Or jump straight into a specific connection / database:
-sql-doctor shell -c local-mysql -d rolerift
+sql-doctor shell -c local-mysql -d <database_name>
 ```
 
 Inside the shell, your prompt reflects your active engine and database:
 ```text
-sql-doctor [mysql@rolerift]> tables
-sql-doctor [mysql@rolerift]> select * from users;
-sql-doctor [mysql@rolerift]> select * from users\G   # Vertical format (one column per line)
-sql-doctor [mysql@rolerift]> use shop_db             # Switch database on the fly
-sql-doctor [mysql@shop_db]> analyze SELECT * FROM orders WHERE status = 'pending'
-sql-doctor [mysql@shop_db]> help                    # View categorized commands
-sql-doctor [mysql@shop_db]> exit                    # Clean exit (discards in-memory session)
+sql-doctor [mysql@<database_name>]> tables
+sql-doctor [mysql@<database_name>]> select * from users;
+sql-doctor [mysql@<database_name>]> select * from users\G   # Vertical format (one column per line)
+sql-doctor [mysql@<database_name>]> use <other_database>    # Switch database on the fly
+sql-doctor [mysql@<other_database>]> analyze SELECT * FROM orders WHERE status = 'pending'
+sql-doctor [mysql@<other_database>]> help                   # View categorized commands
+sql-doctor [mysql@<other_database>]> exit                   # Clean exit (discards in-memory session)
 ```
 
 All session state (active connection and selected database) lives in memory during your shell session and is cleanly discarded upon exit.
@@ -130,7 +130,7 @@ sql-doctor connect --type postgres --host localhost --port 5432 --user postgres 
 sql-doctor connect --type sqlite --file ./my-app.db --name my-local-db --save
 
 # Or run directly against a database URL without saving:
-sql-doctor --db-url "postgres://user:pass@localhost:5432/shop_db" db tables
+sql-doctor --db-url "postgres://user:pass@localhost:5432/<database_name>" db tables
 ```
 
 > **Tip:** You don't need `--save` just to try a connection. Running `connect` without `--save` starts an ephemeral session so you can immediately run subsequent commands in that terminal.
@@ -141,7 +141,7 @@ sql-doctor --db-url "postgres://user:pass@localhost:5432/shop_db" db tables
 sql-doctor databases
 
 # Switch the active database
-sql-doctor use rolerift
+sql-doctor use <database_name>
 
 # Clear session memory
 sql-doctor disconnect
